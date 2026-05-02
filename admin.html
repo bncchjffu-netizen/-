@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1"/>
+  <title>لوحة التحكم — غولد نيوتريشن رويبة</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+  <!-- Firebase CDN (v9 compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Cairo','sans-serif'] } } }
+    }
+  </script>
+
+  <style>
+    body { font-family:'Cairo',sans-serif; background:#0a0a0a; color:#f0f0f0; }
+
+    .btn-gold {
+      background: linear-gradient(135deg,#C8960C 0%,#FFD700 50%,#C8960C 100%);
+      background-size:200%; color:#0d0d0d; font-weight:800;
+      transition:background-position .4s, transform .2s, box-shadow .2s;
+    }
+    .btn-gold:hover { background-position:100%; transform:translateY(-1px); box-shadow:0 6px 20px rgba(255,215,0,.35); }
+    .btn-gold:active { transform:translateY(0); }
+
+    .gold-input {
+      background:rgba(255,255,255,.04); border:1px solid rgba(200,150,12,.3); color:#f0f0f0;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    .gold-input:focus { outline:none; border-color:#FFD700; box-shadow:0 0 0 3px rgba(255,215,0,.12); }
+    .gold-input::placeholder { color:rgba(255,255,255,.3); }
+    .gold-input option { background:#1a1a1a; }
+
+    .admin-card { background:#111; border:1px solid rgba(200,150,12,.2); }
+    .gold-divider { height:2px; background:linear-gradient(90deg,transparent,#FFD700 30%,#C8960C 70%,transparent); }
+
+    #sidebar { transition:transform .3s cubic-bezier(.4,0,.2,1); }
+
+    /* معاينة */
+    .preview-card {
+      background:linear-gradient(160deg,#161616,#111);
+      border:1px solid rgba(200,150,12,.25);
+    }
+    .cat-badge-p { background:rgba(255,215,0,.1); border:1px solid rgba(255,215,0,.3); color:#FFD700; font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; }
+
+    /* حالة المنتج */
+    .stock-on  { color:#4ade80; background:rgba(74,222,128,.1); border:1px solid rgba(74,222,128,.3); }
+    .stock-off { color:#f87171; background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.3); }
+
+    /* toast */
+    #toast { transition:opacity .3s, transform .3s; }
+
+    /* تأثير الظهور */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .fade-up { animation:fadeUp .35s ease forwards; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ════════════════════════════════════════════
+     شاشة تسجيل الدخول
+════════════════════════════════════════════ -->
+<div id="login-screen" class="fixed inset-0 bg-[#0a0a0a] z-[999] flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <div class="flex flex-col items-center mb-8">
+      <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-700 flex items-center justify-center shadow-2xl shadow-yellow-900/50 mb-4">
+        <svg class="w-8 h-8 text-black" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+        </svg>
+      </div>
+      <h1 class="text-white font-black text-2xl">غولد نيوتريشن</h1>
+      <p class="text-yellow-500 text-xs tracking-widest font-semibold mt-0.5">لوحة التحكم — رويبة</p>
+    </div>
+
+    <div class="admin-card rounded-2xl p-6 shadow-2xl">
+      <div class="flex items-center justify-center gap-2 mb-5">
+        <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+        </svg>
+        <p class="text-gray-300 text-sm font-medium">أدخل كلمة المرور للدخول</p>
+      </div>
+
+      <input id="pass-input" type="password" placeholder="كلمة المرور"
+        class="gold-input w-full px-4 py-3 rounded-xl text-center text-sm tracking-widest mb-2"
+        onkeydown="if(event.key==='Enter')doLogin()"/>
+      <p id="pass-error" class="hidden text-red-400 text-xs text-center mb-2">كلمة المرور غير صحيحة ❌</p>
+
+      <button onclick="doLogin()" class="btn-gold w-full py-3 rounded-xl text-sm flex items-center justify-center gap-2 mt-1">
+        🔐 دخول
+      </button>
+
+      <a href="index.html" class="block text-gray-600 text-xs text-center mt-4 hover:text-gray-400 transition-colors">
+        ← العودة للمتجر
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     الواجهة الرئيسية للوحة التحكم
+════════════════════════════════════════════ -->
+<div id="dashboard" class="hidden min-h-screen flex">
+
+  <!-- ───── الشريط الجانبي ───── -->
+  <div id="sidebar-overlay" onclick="closeSidebar()"
+    class="hidden fixed inset-0 bg-black/60 z-30 md:hidden">
+  </div>
+
+  <aside id="sidebar"
+    class="fixed top-0 right-0 h-full w-64 bg-[#0d0d0d] border-l border-yellow-900/25 z-40 flex flex-col translate-x-full md:translate-x-0">
+
+    <!-- رأس الشريط -->
+    <div class="px-5 py-5 border-b border-yellow-900/20">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-700 flex items-center justify-center shadow-lg shadow-yellow-900/40 flex-shrink-0">
+          <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-black text-sm leading-none">غولد نيوتريشن</p>
+          <p class="text-yellow-500 text-xs font-semibold mt-0.5">رويبة — لوحة التحكم</p>
+        </div>
+      </div>
+      <div id="fb-status" class="flex items-center gap-1.5 mt-3 text-xs font-medium text-yellow-600">
+        ⚠️ وضع غير متصل (LocalStorage)
+      </div>
+    </div>
+
+    <!-- روابط التنقل -->
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <button onclick="showTab('dashboard')" id="nav-dashboard"
+        class="nav-btn active-nav w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-right transition-all">
+        📊 الرئيسية
+      </button>
+      <button onclick="showTab('products')" id="nav-products"
+        class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-right text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-all">
+        📦 المنتجات
+      </button>
+      <button onclick="showTab('add')" id="nav-add"
+        class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-right text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-all">
+        ➕ إضافة منتج
+      </button>
+      <button onclick="showTab('password')" id="nav-password"
+        class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-right text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-all">
+        🔐 تغيير كلمة المرور
+      </button>
+    </nav>
+
+    <!-- تذييل الشريط -->
+    <div class="px-3 py-4 border-t border-yellow-900/20 space-y-2">
+      <a href="index.html"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors">
+        ← العودة للمتجر
+      </a>
+      <button onclick="doLogout()"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-red-500/70 hover:text-red-400 hover:bg-red-500/5 transition-colors">
+        🚪 تسجيل الخروج
+      </button>
+    </div>
+  </aside>
+
+  <!-- ───── المحتوى الرئيسي ───── -->
+  <main class="flex-1 md:mr-64 min-h-screen flex flex-col">
+
+    <!-- شريط أعلوي -->
+    <div class="sticky top-0 z-20 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-yellow-900/20 px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span id="page-title" class="text-white font-bold text-sm">الرئيسية</span>
+      </div>
+      <button onclick="openSidebar()" class="md:hidden p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- إشعار (toast) -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-semibold shadow-2xl opacity-0 pointer-events-none translate-y-2">
+    </div>
+
+    <!-- المحتوى -->
+    <div class="flex-1 px-4 sm:px-6 py-6 max-w-5xl w-full mx-auto">
+
+      <!-- ═══ تبويب: الرئيسية ═══ -->
+      <div id="tab-dashboard" class="tab-content space-y-6">
+        <!-- بطاقات الإحصائيات -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div class="admin-card rounded-2xl p-5">
+            <div class="w-9 h-9 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-3 text-lg">📦</div>
+            <p id="stat-total" class="text-yellow-400 text-2xl font-black">0</p>
+            <p class="text-gray-500 text-xs mt-0.5">إجمالي المنتجات</p>
+          </div>
+          <div class="admin-card rounded-2xl p-5">
+            <div class="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center mb-3 text-lg">✅</div>
+            <p id="stat-stock" class="text-green-400 text-2xl font-black">0</p>
+            <p class="text-gray-500 text-xs mt-0.5">متاح في المخزون</p>
+          </div>
+          <div class="admin-card rounded-2xl p-5">
+            <div class="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center mb-3 text-lg">❌</div>
+            <p id="stat-out" class="text-red-400 text-2xl font-black">0</p>
+            <p class="text-gray-500 text-xs mt-0.5">نفذ من المخزون</p>
+          </div>
+        </div>
+
+        <!-- نظرة سريعة على المنتجات -->
+        <div class="admin-card rounded-2xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-yellow-900/20 flex items-center justify-between">
+            <button onclick="showTab('products')" class="text-yellow-400 hover:text-yellow-300 text-xs font-medium">عرض الكل</button>
+            <div class="flex items-center gap-2">
+              <span class="text-white font-bold text-sm">أحدث المنتجات</span>
+              <span>📦</span>
+            </div>
+          </div>
+          <div id="quick-products" class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4"></div>
+        </div>
+
+        <!-- معلومات التواصل -->
+        <div class="admin-card rounded-2xl p-5">
+          <p class="text-white font-bold text-sm mb-3 text-right">معلومات التواصل</p>
+          <div class="space-y-2">
+            <a href="https://wa.me/213549195666" target="_blank"
+              class="flex items-center justify-end gap-2 text-green-400 hover:text-green-300 text-sm transition-colors">
+              واتساب: 0549 195 666 💬
+            </a>
+            <a href="https://www.facebook.com/share/1KTFBn2dV7/" target="_blank"
+              class="flex items-center justify-end gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
+              فيسبوك — غولد نيوتريشن رويبة 📘
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ تبويب: المنتجات ═══ -->
+      <div id="tab-products" class="tab-content hidden space-y-4">
+        <div class="flex items-center justify-between">
+          <button onclick="showTab('add')" class="btn-gold flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm">
+            ➕ إضافة منتج
+          </button>
+          <h2 class="text-white font-bold text-base">قائمة المنتجات</h2>
+        </div>
+
+        <div class="admin-card rounded-2xl overflow-hidden">
+          <div id="products-list" class="divide-y divide-yellow-900/10">
+            <div class="px-5 py-10 text-center">
+              <div class="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ تبويب: تغيير كلمة المرور ═══ -->
+      <div id="tab-password" class="tab-content hidden">
+        <div class="max-w-md mx-auto">
+          <div class="flex items-center gap-3 mb-6 justify-end">
+            <h2 class="text-white font-bold text-base">تغيير كلمة المرور</h2>
+            <span class="text-2xl">🔐</span>
+          </div>
+
+          <div class="admin-card rounded-2xl p-6 space-y-5">
+
+            <!-- مؤشر القوة -->
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/20">
+              <div class="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-base flex-shrink-0">🛡️</div>
+              <p class="text-gray-400 text-xs leading-relaxed">
+                كلمة المرور الحالية: <span id="pw-current-hint" class="text-yellow-400 font-bold">gold2026</span>
+                — تأكد من حفظ كلمتك الجديدة في مكان آمن.
+              </p>
+            </div>
+
+            <!-- الحقل 1: كلمة المرور الحالية -->
+            <div>
+              <label class="text-gray-400 text-xs mb-1.5 block font-medium">كلمة المرور الحالية *</label>
+              <div class="relative">
+                <button type="button" onclick="togglePwVis('pw-current')"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors text-sm">👁️</button>
+                <input id="pw-current" type="password" placeholder="أدخل كلمة المرور الحالية"
+                  class="gold-input w-full pr-4 pl-10 py-2.5 rounded-lg text-sm"/>
+              </div>
+            </div>
+
+            <!-- الحقل 2: كلمة المرور الجديدة -->
+            <div>
+              <label class="text-gray-400 text-xs mb-1.5 block font-medium">كلمة المرور الجديدة *</label>
+              <div class="relative">
+                <button type="button" onclick="togglePwVis('pw-new')"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors text-sm">👁️</button>
+                <input id="pw-new" type="password" placeholder="6 أحرف على الأقل"
+                  oninput="checkPwStrength(this.value); checkPwMatch()"
+                  class="gold-input w-full pr-4 pl-10 py-2.5 rounded-lg text-sm"/>
+              </div>
+              <!-- شريط قوة كلمة المرور -->
+              <div class="mt-2 space-y-1">
+                <div class="flex gap-1">
+                  <div id="str-1" class="h-1 flex-1 rounded-full bg-gray-800 transition-colors duration-300"></div>
+                  <div id="str-2" class="h-1 flex-1 rounded-full bg-gray-800 transition-colors duration-300"></div>
+                  <div id="str-3" class="h-1 flex-1 rounded-full bg-gray-800 transition-colors duration-300"></div>
+                  <div id="str-4" class="h-1 flex-1 rounded-full bg-gray-800 transition-colors duration-300"></div>
+                </div>
+                <p id="str-label" class="text-xs text-gray-600"></p>
+              </div>
+            </div>
+
+            <!-- الحقل 3: تأكيد كلمة المرور الجديدة -->
+            <div>
+              <label class="text-gray-400 text-xs mb-1.5 block font-medium">تأكيد كلمة المرور الجديدة *</label>
+              <div class="relative">
+                <button type="button" onclick="togglePwVis('pw-confirm')"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors text-sm">👁️</button>
+                <input id="pw-confirm" type="password" placeholder="أعد إدخال كلمة المرور الجديدة"
+                  oninput="checkPwMatch()"
+                  class="gold-input w-full pr-4 pl-10 py-2.5 rounded-lg text-sm"/>
+              </div>
+              <p id="pw-match-msg" class="hidden text-xs mt-1.5"></p>
+            </div>
+
+            <!-- رسالة الخطأ العامة -->
+            <p id="pw-error" class="hidden text-red-400 text-xs text-center py-2 px-3 rounded-lg bg-red-500/10 border border-red-500/20"></p>
+
+            <!-- أزرار -->
+            <div class="flex gap-3 pt-1">
+              <button onclick="resetPwForm()"
+                class="flex-1 py-2.5 rounded-xl text-sm text-gray-400 hover:text-gray-200 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors">
+                إلغاء
+              </button>
+              <button onclick="doChangePassword()"
+                class="btn-gold flex-1 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+                💾 حفظ كلمة المرور
+              </button>
+            </div>
+          </div>
+
+          <!-- ملاحظة -->
+          <p class="text-gray-700 text-xs text-center mt-4">
+            كلمة المرور تُحفظ في متصفحك محلياً. إذا مسحت بيانات المتصفح ستعود للافتراضية.
+          </p>
+        </div>
+      </div>
+
+      <!-- ═══ تبويب: إضافة / تعديل ═══ -->
+      <div id="tab-add" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- ─── النموذج ─── -->
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <button onclick="cancelEdit()" class="text-gray-500 hover:text-gray-300 transition-colors text-lg">✕</button>
+              <h2 id="form-title" class="text-white font-bold text-base">إضافة منتج جديد</h2>
+            </div>
+
+            <form id="product-form" onsubmit="submitProduct(event)" class="admin-card rounded-2xl p-5 space-y-4">
+              <input type="hidden" id="edit-id"/>
+
+              <div>
+                <label class="text-gray-400 text-xs mb-1.5 block font-medium">اسم المنتج *</label>
+                <input id="f-name" required type="text" placeholder="مثال: واي بروتين جولد"
+                  oninput="updatePreview()" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+              </div>
+
+              <div>
+                <label class="text-gray-400 text-xs mb-1.5 block font-medium">الفئة *</label>
+                <select id="f-cat" oninput="updatePreview()" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm appearance-none">
+                  <option>بروتين</option>
+                  <option>كرياتين</option>
+                  <option>زيادة الوزن</option>
+                  <option>ما قبل التمرين</option>
+                  <option>أحماض أمينية</option>
+                  <option>حرق الدهون</option>
+                  <option>فيتامينات</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-gray-400 text-xs mb-1.5 block font-medium">السعر (دج) *</label>
+                <input id="f-price" required type="number" min="0" step="100" placeholder="مثال: 3500"
+                  oninput="updatePreview()" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+              </div>
+
+              <div>
+                <label class="text-gray-400 text-xs mb-1.5 block font-medium">رابط الصورة (URL)</label>
+                <input id="f-img" type="url" placeholder="https://..."
+                  oninput="updatePreview()" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+              </div>
+
+              <div>
+                <label class="text-gray-400 text-xs mb-1.5 block font-medium">الوصف</label>
+                <textarea id="f-desc" rows="2" placeholder="وصف قصير..."
+                  oninput="updatePreview()" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm resize-none"></textarea>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input id="f-stock" type="checkbox" checked class="sr-only peer" onchange="updatePreview()"/>
+                  <div class="w-10 h-5 bg-gray-700 rounded-full peer-checked:bg-yellow-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:right-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:-translate-x-5"></div>
+                </label>
+                <span id="stock-label" class="text-gray-300 text-sm">متاح في المخزون</span>
+              </div>
+
+              <button type="submit" class="btn-gold w-full py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+                💾 <span id="submit-label">إضافة المنتج</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- ─── المعاينة المباشرة ─── -->
+          <div>
+            <div class="flex items-center gap-2 mb-4 justify-end">
+              <h2 class="text-white font-bold text-base">معاينة المنتج</h2>
+              <span>👁️</span>
+            </div>
+            <div class="preview-card rounded-2xl overflow-hidden max-w-xs mr-auto">
+              <div class="relative h-52 overflow-hidden bg-gray-900">
+                <img id="prev-img" src=""
+                  class="w-full h-full object-cover"
+                  onerror="this.src='https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=60'"/>
+                <div id="prev-no-img" class="absolute inset-0 flex items-center justify-center">
+                  <span class="text-gray-700 text-5xl">📦</span>
+                </div>
+                <span id="prev-cat" class="cat-badge-p absolute top-3 right-3 px-2.5 py-1 rounded-full font-semibold">الفئة</span>
+                <div id="prev-out-overlay" class="hidden absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <span class="text-red-400 font-bold text-sm border border-red-500/50 px-3 py-1 rounded">نفذ المخزون</span>
+                </div>
+              </div>
+              <div class="p-4">
+                <h3 id="prev-name" class="text-white font-bold text-base">اسم المنتج</h3>
+                <p id="prev-desc" class="text-gray-400 text-xs mt-1 line-clamp-2">الوصف سيظهر هنا</p>
+                <div class="mt-4 flex items-center justify-between">
+                  <button class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold btn-gold">
+                    أضف 🛒
+                  </button>
+                  <span id="prev-price" class="text-yellow-400 font-extrabold text-lg">0 دج</span>
+                </div>
+              </div>
+            </div>
+            <p class="text-gray-600 text-xs text-center mt-4">هذا ما سيراه الزبون في المتجر</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /container -->
+  </main>
+</div><!-- /dashboard -->
+
+<!-- ════════════════════════════════════════════
+     مودال تعديل السعر
+════════════════════════════════════════════ -->
+<div id="price-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+  <div class="admin-card rounded-2xl p-6 w-full max-w-sm">
+    <h3 class="text-white font-bold text-base text-right mb-4">تعديل السعر</h3>
+    <input type="hidden" id="pm-id"/>
+    <p id="pm-name" class="text-gray-400 text-sm text-right mb-3"></p>
+    <label class="text-gray-400 text-xs mb-1.5 block">السعر الجديد (دج)</label>
+    <input id="pm-price" type="number" min="0" step="100" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm mb-4"
+      onkeydown="if(event.key==='Enter')savePriceModal()"/>
+    <div class="flex gap-3 flex-row-reverse">
+      <button onclick="savePriceModal()" class="btn-gold flex-1 py-2.5 rounded-xl text-sm">حفظ</button>
+      <button onclick="closePriceModal()" class="flex-1 py-2.5 rounded-xl text-sm text-gray-400 hover:text-gray-200 bg-white/5 hover:bg-white/10 transition-colors">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- السكريبت المشترك -->
+<script src="script.js"></script>
+
+<script>
+/* ════════════════════════════════════════════
+   منطق لوحة التحكم
+════════════════════════════════════════════ */
+
+const ADMIN_PASSWORD_DEFAULT = "gold2026";
+/* كلمة المرور الفعلية: تُقرأ من localStorage إن وُجدت وإلا الافتراضية */
+function getActivePassword() {
+  return localStorage.getItem("gnr_admin_pass") || ADMIN_PASSWORD_DEFAULT;
+}
+
+let allProducts = [];
+let currentEditId = null;
+
+/* ── تسجيل الدخول ── */
+function doLogin() {
+  const pass = document.getElementById("pass-input").value;
+  if (pass === getActivePassword()) {
+    sessionStorage.setItem("gnr_admin", "1");
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+    document.getElementById("dashboard").classList.add("flex");
+    initDashboard();
+  } else {
+    document.getElementById("pass-error").classList.remove("hidden");
+    document.getElementById("pass-input").value = "";
+    document.getElementById("pass-input").focus();
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem("gnr_admin");
+  location.reload();
+}
+
+/* ── تحقق من الجلسة عند التحميل ── */
+document.addEventListener("DOMContentLoaded", () => {
+  if (sessionStorage.getItem("gnr_admin") === "1") {
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+    document.getElementById("dashboard").classList.add("flex");
+    initDashboard();
+  }
+  document.getElementById("pass-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doLogin();
+  });
+  /* إعداد مراقبة مدخل التبديل */
+  document.getElementById("f-stock").addEventListener("change", () => {
+    document.getElementById("stock-label").textContent =
+      document.getElementById("f-stock").checked ? "متاح في المخزون" : "نفذ المخزون";
+    updatePreview();
+  });
+});
+
+/* ── تهيئة لوحة التحكم ── */
+function initDashboard() {
+  /* حالة Firebase */
+  if (FB_CONFIGURED) {
+    document.getElementById("fb-status").innerHTML = "🟢 متصل بـ Firebase";
+    document.getElementById("fb-status").className = "flex items-center gap-1.5 mt-3 text-xs font-medium text-green-400";
+  }
+
+  /* الاستماع للمنتجات */
+  listenProducts((products) => {
+    allProducts = products;
+    updateStats(products);
+    renderQuickProducts(products);
+    renderProductsList(products);
+  });
+}
+
+/* ── الإحصائيات ── */
+function updateStats(products) {
+  document.getElementById("stat-total").textContent = products.length;
+  document.getElementById("stat-stock").textContent = products.filter((p) => p.inStock).length;
+  document.getElementById("stat-out").textContent   = products.filter((p) => !p.inStock).length;
+}
+
+/* ── نظرة سريعة ── */
+function renderQuickProducts(products) {
+  document.getElementById("quick-products").innerHTML = products.slice(0, 6).map((p) => `
+    <div class="flex items-center gap-2 p-2 rounded-xl bg-white/3 border border-yellow-900/15">
+      <div class="flex-1 min-w-0 text-right">
+        <p class="text-white text-xs font-semibold truncate">${p.name}</p>
+        <p class="text-yellow-400 text-xs font-bold">${p.price ? p.price.toLocaleString("fr-DZ") + " دج" : ""}</p>
+      </div>
+      <div class="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-gray-900">
+        <img src="${p.image || ''}" alt="${p.name}" class="w-full h-full object-cover"
+          onerror="this.src='https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=100&q=50'"/>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* ── قائمة المنتجات الكاملة ── */
+function renderProductsList(products) {
+  const container = document.getElementById("products-list");
+  if (products.length === 0) {
+    container.innerHTML = `<div class="px-5 py-12 text-center text-gray-500 text-sm">لا توجد منتجات بعد</div>`;
+    return;
+  }
+  container.innerHTML = products.map((p) => `
+    <div class="px-4 py-3.5 flex items-center gap-3 hover:bg-white/[.02] transition-colors fade-up">
+      <!-- أزرار الإجراءات -->
+      <div class="flex items-center gap-1.5 flex-shrink-0">
+        <button onclick="confirmDelete('${p.id}')"
+          class="p-2 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors text-sm"
+          title="حذف">🗑️</button>
+        <button onclick="openPriceModal('${p.id}','${p.name}',${p.price})"
+          class="p-2 rounded-lg hover:bg-blue-500/10 text-gray-600 hover:text-blue-400 transition-colors text-sm"
+          title="تعديل السعر">💲</button>
+        <button onclick="startEdit('${p.id}')"
+          class="p-2 rounded-lg hover:bg-yellow-500/10 text-gray-600 hover:text-yellow-400 transition-colors text-sm"
+          title="تعديل">✏️</button>
+      </div>
+      <!-- حالة المخزون -->
+      <button onclick="toggleStock('${p.id}',${p.inStock})"
+        class="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 transition-colors ${p.inStock ? 'stock-on' : 'stock-off'}">
+        ${p.inStock ? "✅ متاح" : "❌ نفذ"}
+      </button>
+      <!-- المعلومات -->
+      <div class="flex-1 min-w-0 text-right">
+        <p class="text-white font-semibold text-sm truncate">${p.name}</p>
+        <div class="flex items-center gap-2 justify-end mt-0.5">
+          <span class="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full">${p.category}</span>
+          <span class="text-yellow-500 text-xs font-bold">${p.price ? p.price.toLocaleString("fr-DZ") + " دج" : ""}</span>
+        </div>
+      </div>
+      <!-- الصورة -->
+      <div class="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-900">
+        <img src="${p.image || ''}" alt="${p.name}" class="w-full h-full object-cover"
+          onerror="this.src='https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=100&q=50'"/>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* ════════════════════════════════════════════
+   CRUD
+════════════════════════════════════════════ */
+
+/* ── إضافة / تعديل ── */
+async function submitProduct(e) {
+  e.preventDefault();
+  const name  = document.getElementById("f-name").value.trim();
+  const cat   = document.getElementById("f-cat").value;
+  const price = parseFloat(document.getElementById("f-price").value);
+  const img   = document.getElementById("f-img").value.trim();
+  const desc  = document.getElementById("f-desc").value.trim();
+  const stock = document.getElementById("f-stock").checked;
+  const id    = document.getElementById("edit-id").value;
+
+  if (!name || isNaN(price) || price <= 0) {
+    showToast("يرجى إدخال الاسم والسعر بشكل صحيح.", "error"); return;
+  }
+
+  const data = {
+    name, category: cat, price,
+    image: img || "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
+    description: desc, inStock: stock,
+  };
+
+  try {
+    if (id) {
+      await updateProduct(id, data);
+      showToast("تم تحديث المنتج بنجاح ✅");
+    } else {
+      await addProduct(data);
+      showToast("تمت إضافة المنتج بنجاح ✅");
+    }
+    resetForm();
+    showTab("products");
+  } catch (err) {
+    showToast("حدث خطأ: " + err.message, "error");
+  }
+}
+
+/* ── حذف مع تأكيد ── */
+function confirmDelete(id) {
+  if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+  deleteProduct(id)
+    .then(() => showToast("تم حذف المنتج ✅"))
+    .catch((e) => showToast("فشل الحذف: " + e.message, "error"));
+}
+
+/* ── تعديل المنتج كاملاً ── */
+function startEdit(id) {
+  const p = allProducts.find((x) => x.id === id);
+  if (!p) return;
+  currentEditId = id;
+  document.getElementById("edit-id").value = id;
+  document.getElementById("f-name").value  = p.name;
+  document.getElementById("f-cat").value   = p.category;
+  document.getElementById("f-price").value = p.price;
+  document.getElementById("f-img").value   = p.image || "";
+  document.getElementById("f-desc").value  = p.description || "";
+  document.getElementById("f-stock").checked = !!p.inStock;
+  document.getElementById("stock-label").textContent = p.inStock ? "متاح في المخزون" : "نفذ المخزون";
+  document.getElementById("form-title").textContent  = "تعديل المنتج";
+  document.getElementById("submit-label").textContent = "حفظ التعديلات";
+  updatePreview();
+  showTab("add");
+}
+
+function cancelEdit() {
+  resetForm();
+  showTab("products");
+}
+
+function resetForm() {
+  currentEditId = null;
+  document.getElementById("product-form").reset();
+  document.getElementById("edit-id").value = "";
+  document.getElementById("f-stock").checked = true;
+  document.getElementById("stock-label").textContent = "متاح في المخزون";
+  document.getElementById("form-title").textContent   = "إضافة منتج جديد";
+  document.getElementById("submit-label").textContent = "إضافة المنتج";
+  updatePreview();
+}
+
+/* ── تبديل حالة المخزون ── */
+function toggleStock(id, current) {
+  updateProduct(id, { inStock: !current })
+    .then(() => showToast(`تم التحديث ✅`))
+    .catch((e) => showToast("خطأ: " + e.message, "error"));
+}
+
+/* ════════════════════════════════════════════
+   مودال تعديل السعر
+════════════════════════════════════════════ */
+function openPriceModal(id, name, price) {
+  document.getElementById("pm-id").value    = id;
+  document.getElementById("pm-name").textContent = name;
+  document.getElementById("pm-price").value = price;
+  document.getElementById("price-modal").classList.remove("hidden");
+  setTimeout(() => document.getElementById("pm-price").focus(), 100);
+}
+function closePriceModal() {
+  document.getElementById("price-modal").classList.add("hidden");
+}
+async function savePriceModal() {
+  const id    = document.getElementById("pm-id").value;
+  const price = parseFloat(document.getElementById("pm-price").value);
+  if (isNaN(price) || price <= 0) { showToast("أدخل سعراً صحيحاً", "error"); return; }
+  try {
+    await updatePrice(id, price);
+    showToast("تم تحديث السعر ✅");
+    closePriceModal();
+  } catch (e) { showToast("خطأ: " + e.message, "error"); }
+}
+
+/* ════════════════════════════════════════════
+   المعاينة المباشرة
+════════════════════════════════════════════ */
+function updatePreview() {
+  const name  = document.getElementById("f-name").value  || "اسم المنتج";
+  const cat   = document.getElementById("f-cat").value   || "الفئة";
+  const price = parseFloat(document.getElementById("f-price").value) || 0;
+  const img   = document.getElementById("f-img").value.trim();
+  const desc  = document.getElementById("f-desc").value  || "الوصف سيظهر هنا";
+  const stock = document.getElementById("f-stock").checked;
+
+  document.getElementById("prev-name").textContent  = name;
+  document.getElementById("prev-cat").textContent   = cat;
+  document.getElementById("prev-price").textContent = price.toLocaleString("fr-DZ") + " دج";
+  document.getElementById("prev-desc").textContent  = desc;
+
+  const imgEl   = document.getElementById("prev-img");
+  const noImgEl = document.getElementById("prev-no-img");
+  if (img) {
+    imgEl.src = img;
+    imgEl.classList.remove("hidden");
+    noImgEl.classList.add("hidden");
+  } else {
+    imgEl.classList.add("hidden");
+    noImgEl.classList.remove("hidden");
+  }
+
+  const outEl = document.getElementById("prev-out-overlay");
+  stock ? outEl.classList.add("hidden") : outEl.classList.remove("hidden");
+}
+
+/* ════════════════════════════════════════════
+   تبويبات + شريط جانبي
+════════════════════════════════════════════ */
+const tabTitles = { dashboard:"الرئيسية", products:"المنتجات", add:"إضافة منتج", password:"تغيير كلمة المرور" };
+
+function showTab(name) {
+  document.querySelectorAll(".tab-content").forEach((el) => el.classList.add("hidden"));
+  document.getElementById("tab-" + name).classList.remove("hidden");
+  document.getElementById("page-title").textContent = tabTitles[name] || name;
+  if (name === "password") { resetPwForm(); refreshPwHint(); }
+
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.classList.remove("bg-yellow-500/15","text-yellow-400","border","border-yellow-500/25");
+    btn.classList.add("text-gray-400","hover:bg-white/5","hover:text-gray-200");
+  });
+  const active = document.getElementById("nav-" + name);
+  if (active) {
+    active.classList.add("bg-yellow-500/15","text-yellow-400","border","border-yellow-500/25");
+    active.classList.remove("text-gray-400","hover:bg-white/5","hover:text-gray-200");
+  }
+  closeSidebar();
+}
+
+function openSidebar() {
+  document.getElementById("sidebar").style.transform = "translateX(0)";
+  document.getElementById("sidebar-overlay").classList.remove("hidden");
+}
+function closeSidebar() {
+  if (window.innerWidth < 768) {
+    document.getElementById("sidebar").style.transform = "translateX(100%)";
+    document.getElementById("sidebar-overlay").classList.add("hidden");
+  }
+}
+
+/* ════════════════════════════════════════════
+   تغيير كلمة المرور
+════════════════════════════════════════════ */
+
+/**
+ * يُحدّث تلميح كلمة المرور الحالية عند فتح التبويب.
+ */
+function refreshPwHint() {
+  const stored = localStorage.getItem("gnr_admin_pass");
+  const hint = document.getElementById("pw-current-hint");
+  if (hint) hint.textContent = stored ? "••••••••" : ADMIN_PASSWORD_DEFAULT;
+}
+
+/**
+ * تبديل إظهار / إخفاء كلمة المرور.
+ * @param {string} id - معرّف حقل الإدخال
+ */
+function togglePwVis(id) {
+  const input = document.getElementById(id);
+  input.type = input.type === "password" ? "text" : "password";
+}
+
+/**
+ * يحسب قوة كلمة المرور ويحدّث الشريط المرئي.
+ * @param {string} val - النص المُدخَل
+ */
+function checkPwStrength(val) {
+  let score = 0;
+  if (val.length >= 6)  score++;
+  if (val.length >= 10) score++;
+  if (/[A-Z]/.test(val) || /[a-z]/.test(val)) score++;
+  if (/[0-9]/.test(val) && /[^A-Za-z0-9]/.test(val)) score++;
+
+  const colors  = ["bg-red-500","bg-orange-500","bg-yellow-500","bg-green-500"];
+  const labels  = ["ضعيفة","مقبولة","جيدة","قوية جداً"];
+  const txtCols = ["text-red-400","text-orange-400","text-yellow-400","text-green-400"];
+
+  for (let i = 1; i <= 4; i++) {
+    const bar = document.getElementById("str-" + i);
+    bar.className = `h-1 flex-1 rounded-full transition-colors duration-300 ${i <= score ? colors[score - 1] : "bg-gray-800"}`;
+  }
+  const lbl = document.getElementById("str-label");
+  lbl.textContent = val.length > 0 ? "القوة: " + (labels[score - 1] || "ضعيفة") : "";
+  lbl.className   = `text-xs ${val.length > 0 ? (txtCols[score - 1] || "text-red-400") : "text-gray-600"}`;
+}
+
+/**
+ * يتحقق من تطابق كلمتَي المرور ويُظهر رسالة فورية.
+ */
+function checkPwMatch() {
+  const nw   = document.getElementById("pw-new").value;
+  const conf = document.getElementById("pw-confirm").value;
+  const msg  = document.getElementById("pw-match-msg");
+  if (!conf) { msg.classList.add("hidden"); return; }
+  msg.classList.remove("hidden");
+  if (nw === conf) {
+    msg.textContent = "✅ كلمتا المرور متطابقتان";
+    msg.className   = "text-xs mt-1.5 text-green-400";
+  } else {
+    msg.textContent = "❌ كلمتا المرور غير متطابقتين";
+    msg.className   = "text-xs mt-1.5 text-red-400";
+  }
+}
+
+/**
+ * تنفيذ تغيير كلمة المرور مع التحقق الكامل.
+ */
+function doChangePassword() {
+  const current = document.getElementById("pw-current").value;
+  const nw      = document.getElementById("pw-new").value;
+  const confirm = document.getElementById("pw-confirm").value;
+  const errEl   = document.getElementById("pw-error");
+
+  /* ── التحقق من كلمة المرور الحالية ── */
+  if (current !== getActivePassword()) {
+    showPwError("كلمة المرور الحالية غير صحيحة ❌"); return;
+  }
+  /* ── التحقق من الحد الأدنى للطول ── */
+  if (nw.length < 6) {
+    showPwError("كلمة المرور الجديدة قصيرة جداً (6 أحرف على الأقل) ⚠️"); return;
+  }
+  /* ── التحقق من التطابق ── */
+  if (nw !== confirm) {
+    showPwError("كلمتا المرور الجديدة غير متطابقتين ❌"); return;
+  }
+  /* ── منع استخدام نفس كلمة المرور ── */
+  if (nw === getActivePassword()) {
+    showPwError("كلمة المرور الجديدة مطابقة للحالية، اختر كلمة مختلفة ⚠️"); return;
+  }
+
+  /* ── حفظ كلمة المرور الجديدة ── */
+  localStorage.setItem("gnr_admin_pass", nw);
+  errEl.classList.add("hidden");
+  resetPwForm();
+  refreshPwHint();
+  showToast("تم تغيير كلمة المرور بنجاح ✅");
+}
+
+function showPwError(msg) {
+  const errEl = document.getElementById("pw-error");
+  errEl.textContent = msg;
+  errEl.classList.remove("hidden");
+}
+
+/**
+ * تفريغ نموذج تغيير كلمة المرور.
+ */
+function resetPwForm() {
+  ["pw-current","pw-new","pw-confirm"].forEach((id) => {
+    document.getElementById(id).value = "";
+    document.getElementById(id).type  = "password";
+  });
+  document.getElementById("pw-error").classList.add("hidden");
+  document.getElementById("pw-match-msg").classList.add("hidden");
+  checkPwStrength("");
+}
+
+/* ════════════════════════════════════════════
+   إشعار Toast
+════════════════════════════════════════════ */
+let toastTimer = null;
+function showToast(msg, type = "success") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-semibold shadow-2xl transition-all duration-300 ${
+    type === "success"
+      ? "bg-green-900/95 border border-green-600/50 text-green-300"
+      : "bg-red-900/95 border border-red-600/50 text-red-300"
+  }`;
+  el.style.opacity = "1";
+  el.style.transform = "translateX(-50%) translateY(0)";
+  el.style.pointerEvents = "none";
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transform = "translateX(-50%) translateY(-8px)";
+  }, 3000);
+}
+</script>
+<script src="https://replit-cdn.com/replit-pill/replit-pill.global.js" data-repl-id="54be373d-f7ee-444a-91c0-206ca5fdd6aa"></script></body>
+</html>

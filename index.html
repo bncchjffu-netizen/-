@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1"/>
+  <title>غولد نيوتريشن رويبة</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts — Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+  <!-- Firebase CDN (v9 compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    /* ── Tailwind config ── */
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Cairo', 'sans-serif'] },
+          colors: {
+            gold:  { DEFAULT:'#F5C518', light:'#FFD700', dark:'#C8960C' },
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Cairo', sans-serif; background: #0d0d0d; color: #f0f0f0; }
+
+    /* ── ألوان مخصصة ── */
+    .btn-gold {
+      background: linear-gradient(135deg, #C8960C 0%, #FFD700 50%, #C8960C 100%);
+      background-size: 200% 200%;
+      color: #0d0d0d; font-weight: 800;
+      transition: background-position .4s, transform .2s, box-shadow .2s;
+    }
+    .btn-gold:hover {
+      background-position: 100% 100%;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(255,215,0,.35);
+    }
+    .btn-gold:active { transform: translateY(0); }
+
+    .btn-wa {
+      background: linear-gradient(135deg,#25D366,#128C7E);
+      color:#fff; font-weight:800;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .btn-wa:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(37,211,102,.35); }
+
+    /* بطاقة منتج */
+    .product-card {
+      background: linear-gradient(160deg,#161616,#111);
+      border: 1px solid rgba(200,150,12,.2);
+      transition: transform .25s, box-shadow .25s, border-color .25s;
+    }
+    .product-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 35px rgba(255,215,0,.15);
+      border-color: rgba(255,215,0,.45);
+    }
+
+    /* الشريط الجانبي للسلة */
+    #cart-sidebar {
+      transition: transform .35s cubic-bezier(.4,0,.2,1);
+    }
+    #cart-overlay { transition: opacity .35s; }
+
+    /* مدخل ذهبي */
+    .gold-input {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(200,150,12,.3);
+      color: #f0f0f0;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .gold-input:focus {
+      outline: none;
+      border-color: #FFD700;
+      box-shadow: 0 0 0 3px rgba(255,215,0,.12);
+    }
+    .gold-input::placeholder { color: rgba(255,255,255,.3); }
+    .gold-input option { background: #1a1a1a; }
+
+    /* فاصل ذهبي */
+    .gold-divider { height:2px; background:linear-gradient(90deg,transparent,#FFD700 30%,#C8960C 70%,transparent); }
+
+    /* شارة الفئة */
+    .cat-badge {
+      background: rgba(255,215,0,.1);
+      border: 1px solid rgba(255,215,0,.3);
+      color: #FFD700;
+      font-size:.65rem; letter-spacing:.08em; text-transform:uppercase;
+    }
+
+    /* Hero خلفية */
+    .hero-bg {
+      background:
+        radial-gradient(ellipse at top right, rgba(200,150,12,.15) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom left, rgba(200,150,12,.08) 0%, transparent 60%),
+        #0d0d0d;
+    }
+
+    /* شريط تمرير */
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-track { background:#111; }
+    ::-webkit-scrollbar-thumb { background:#C8960C; border-radius:3px; }
+
+    /* زر الكمية */
+    .qty-btn {
+      width:1.75rem; height:1.75rem;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:4px;
+      background: rgba(255,215,0,.1);
+      color:#FFD700;
+      border:1px solid rgba(255,215,0,.2);
+      cursor:pointer; font-size:1rem; font-weight:700;
+      transition:background .2s; user-select:none;
+    }
+    .qty-btn:hover { background:rgba(255,215,0,.2); }
+
+    /* أنيميشن ظهور */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up { animation: fadeUp .45s ease forwards; }
+
+    /* زر واتساب ثابت */
+    #wa-fab {
+      background:linear-gradient(135deg,#25D366,#128C7E);
+      box-shadow:0 4px 20px rgba(37,211,102,.4);
+      transition:transform .2s, box-shadow .2s;
+    }
+    #wa-fab:hover { transform:scale(1.1); box-shadow:0 6px 28px rgba(37,211,102,.55); }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+<!-- ════════════════════════════════════════════
+     شريط التنقل
+════════════════════════════════════════════ -->
+<header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="flex items-center justify-between h-16">
+
+      <!-- زر السلة + القائمة الجوالة (يسار) -->
+      <div class="flex items-center gap-3">
+        <button onclick="openCart()" class="relative p-2 rounded-lg hover:bg-yellow-500/10 transition-colors group">
+          <svg class="w-5 h-5 text-gray-300 group-hover:text-yellow-400 transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+          <span id="cart-badge" class="hidden absolute -top-1 -left-1 min-w-[1.2rem] h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 text-black text-[.65rem] font-black rounded-full flex items-center justify-center px-1">0</span>
+        </button>
+        <button onclick="toggleMobileMenu()" class="sm:hidden p-2 rounded-lg hover:bg-yellow-500/10 transition-colors" id="menu-btn">
+          <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- روابط سطح المكتب -->
+      <nav class="hidden sm:flex items-center gap-6">
+        <a href="admin.html" class="flex items-center gap-1.5 text-yellow-400 hover:text-yellow-300 text-sm font-semibold border border-yellow-500/40 hover:border-yellow-400/70 px-3 py-1.5 rounded-md transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+          </svg>
+          لوحة التحكم
+        </a>
+        <a href="https://maps.app.goo.gl/xucjzoRFYjSK6dUF6?g_st=aw" target="_blank" class="text-gray-300 hover:text-yellow-400 text-sm font-medium transition-colors">موقعنا</a>
+        <a href="https://www.facebook.com/share/1KTFBn2dV7/" target="_blank" class="text-gray-300 hover:text-yellow-400 text-sm font-medium transition-colors">فيسبوك</a>
+        <a href="#products" class="text-gray-300 hover:text-yellow-400 text-sm font-medium transition-colors">المنتجات</a>
+      </nav>
+
+      <!-- الشعار (يمين) -->
+      <a href="#" class="flex items-center gap-2 group">
+        <div class="text-right">
+          <span class="font-black text-white text-sm leading-none block">Gold Nutrition</span>
+          <span class="text-yellow-500 text-[10px] font-semibold tracking-widest block">Rouiba</span>
+        </div>
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-700 flex items-center justify-center shadow-lg shadow-yellow-900/40 group-hover:shadow-yellow-500/30 transition-shadow flex-shrink-0">
+          <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+          </svg>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- القائمة الجوالة -->
+  <div id="mobile-menu" class="hidden sm:hidden border-t border-yellow-900/30 bg-black/98 backdrop-blur-md">
+    <div class="px-4 py-4 space-y-2">
+      <a href="#products" onclick="closeMobileMenu()" class="block text-gray-300 hover:text-yellow-400 text-sm font-medium py-2 text-right transition-colors">المنتجات</a>
+      <a href="https://www.facebook.com/share/1KTFBn2dV7/" target="_blank" class="block text-gray-300 hover:text-yellow-400 text-sm font-medium py-2 text-right transition-colors">فيسبوك</a>
+      <a href="https://maps.app.goo.gl/xucjzoRFYjSK6dUF6?g_st=aw" target="_blank" class="block text-gray-300 hover:text-yellow-400 text-sm font-medium py-2 text-right transition-colors">موقعنا</a>
+      <a href="admin.html" class="flex items-center justify-end gap-1.5 text-yellow-400 text-sm font-semibold py-2 transition-colors">
+        لوحة التحكم
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════
+     قسم الهيرو
+════════════════════════════════════════════ -->
+<section class="hero-bg pt-28 pb-16 px-4 sm:px-6">
+  <div class="max-w-7xl mx-auto text-center">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 text-xs font-semibold tracking-widest uppercase mb-5">
+      ⚡ المتجر الأول للمكملات في رويبة
+    </div>
+    <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-tight mb-4">
+      ارتقِ بمستواك
+      <span class="bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-600 bg-clip-text text-transparent"> الرياضي</span>
+    </h1>
+    <p class="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto mb-8">
+      مكملات غذائية ممتازة للرياضيين الجادين. جودة تثق بها، نتائج ستشعر بها.
+    </p>
+
+    <!-- إحصائيات -->
+    <div class="flex items-center justify-center gap-6 sm:gap-10 mb-10">
+      <div>
+        <span id="stat-total" class="text-yellow-400 text-2xl font-black block">8+</span>
+        <span class="text-gray-500 text-xs uppercase tracking-wider">منتج</span>
+      </div>
+      <div class="w-px h-8 bg-yellow-900/50"></div>
+      <div>
+        <span class="text-yellow-400 text-2xl font-black block">100%</span>
+        <span class="text-gray-500 text-xs uppercase tracking-wider">أصلي</span>
+      </div>
+      <div class="w-px h-8 bg-yellow-900/50"></div>
+      <div>
+        <span class="text-yellow-400 text-2xl font-black block">🚀</span>
+        <span class="text-gray-500 text-xs uppercase tracking-wider">توصيل سريع</span>
+      </div>
+    </div>
+
+    <!-- بحث -->
+    <div class="relative max-w-xl mx-auto">
+      <svg class="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+      </svg>
+      <input id="search-input" type="search" placeholder="ابحث عن المنتجات..." oninput="renderProducts()"
+        class="gold-input w-full pr-11 pl-4 py-3.5 rounded-xl text-sm"/>
+    </div>
+  </div>
+</section>
+
+<div class="gold-divider"></div>
+
+<!-- ════════════════════════════════════════════
+     المنتجات
+════════════════════════════════════════════ -->
+<section id="products" class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+
+  <!-- فلاتر الفئات -->
+  <div class="flex flex-wrap gap-2 mb-6 justify-end" id="category-filters">
+    <!-- تُملأ بالجافاسكريبت -->
+  </div>
+
+  <!-- شبكة المنتجات -->
+  <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+    <!-- تُملأ بالجافاسكريبت -->
+    <div class="col-span-full flex items-center justify-center py-20">
+      <div class="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  </div>
+
+  <!-- ميزات -->
+  <div class="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="p-5 rounded-2xl bg-white/[.03] border border-yellow-900/20 flex gap-4">
+      <div class="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center flex-shrink-0 text-xl">🏆</div>
+      <div>
+        <h3 class="text-white font-semibold text-sm">100% أصلي</h3>
+        <p class="text-gray-500 text-xs mt-1 leading-relaxed">جميع المنتجات معتمدة ومصادرها موثوقة.</p>
+      </div>
+    </div>
+    <div class="p-5 rounded-2xl bg-white/[.03] border border-yellow-900/20 flex gap-4">
+      <div class="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center flex-shrink-0 text-xl">⚡</div>
+      <div>
+        <h3 class="text-white font-semibold text-sm">توصيل سريع</h3>
+        <p class="text-gray-500 text-xs mt-1 leading-relaxed">شحن في نفس اليوم للطلبات قبل الساعة 4 مساءً.</p>
+      </div>
+    </div>
+    <div class="p-5 rounded-2xl bg-white/[.03] border border-yellow-900/20 flex gap-4">
+      <div class="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center flex-shrink-0 text-xl">📞</div>
+      <div>
+        <h3 class="text-white font-semibold text-sm">نصيحة خبير</h3>
+        <p class="text-gray-500 text-xs mt-1 leading-relaxed">لست متأكداً؟ اتصل بنا — نحن هنا لمساعدتك.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     التذييل
+════════════════════════════════════════════ -->
+<footer class="bg-[#080808] border-t border-yellow-900/25 mt-10">
+  <div class="gold-divider"></div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-10">
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-700 flex items-center justify-center">
+            <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+            </svg>
+          </div>
+          <div>
+            <span class="font-black text-white text-sm block">Gold Nutrition</span>
+            <span class="text-yellow-500 text-xs font-semibold block">Rouiba</span>
+          </div>
+        </div>
+        <p class="text-gray-500 text-sm leading-relaxed">متجرك الموثوق للمكملات الغذائية في رويبة.</p>
+      </div>
+      <div>
+        <h4 class="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4">تواصل معنا</h4>
+        <div class="space-y-3">
+          <a href="tel:0549195666" class="flex items-center gap-2 text-gray-400 hover:text-yellow-400 text-sm transition-colors">
+            0549 195 666 <span class="text-yellow-600">📞</span>
+          </a>
+          <a href="tel:0557113327" class="flex items-center gap-2 text-gray-400 hover:text-yellow-400 text-sm transition-colors">
+            0557 113 327 <span class="text-yellow-600">📞</span>
+          </a>
+        </div>
+      </div>
+      <div>
+        <h4 class="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4">ابحث عنا</h4>
+        <div class="space-y-3">
+          <a href="https://www.facebook.com/share/1KTFBn2dV7/" target="_blank" class="flex items-center gap-2 text-gray-400 hover:text-yellow-400 text-sm transition-colors">
+            غولد نيوتريشن رويبة <span>📘</span>
+          </a>
+          <a href="https://maps.app.goo.gl/xucjzoRFYjSK6dUF6?g_st=aw" target="_blank" class="flex items-center gap-2 text-gray-400 hover:text-yellow-400 text-sm transition-colors">
+            عرض على خرائط غوغل <span>📍</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="mt-10 pt-6 border-t border-yellow-900/20 flex flex-col sm:flex-row items-center justify-between gap-2 text-gray-600 text-xs">
+      <span>صُنع بـ 💛 للأبطال</span>
+      <span>© 2025 غولد نيوتريشن رويبة. جميع الحقوق محفوظة.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ════════════════════════════════════════════
+     سلة التسوق (شريط جانبي)
+════════════════════════════════════════════ -->
+<!-- طبقة التعتيم -->
+<div id="cart-overlay" onclick="closeCart()"
+  class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300">
+</div>
+
+<!-- الشريط الجانبي -->
+<div id="cart-sidebar"
+  class="fixed top-0 right-0 h-full w-full sm:w-[420px] bg-[#0f0f0f] border-l border-yellow-900/30 z-50 flex flex-col shadow-2xl translate-x-full"
+  style="transition:transform .35s cubic-bezier(.4,0,.2,1)">
+
+  <!-- رأس السلة -->
+  <div class="flex items-center justify-between px-5 py-4 border-b border-yellow-900/30">
+    <button onclick="closeCart()" class="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
+      <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+    <div class="flex items-center gap-2">
+      <span class="font-bold text-white text-lg">سلة التسوق</span>
+      <span id="cart-header-count" class="hidden min-w-[1.4rem] h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 text-black text-[.65rem] font-black rounded-full flex items-center justify-center px-1.5">0</span>
+    </div>
+  </div>
+
+  <!-- محتوى السلة -->
+  <div id="cart-items" class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+    <!-- تُملأ بالجافاسكريبت -->
+  </div>
+
+  <!-- تذييل السلة -->
+  <div id="cart-footer" class="hidden px-5 py-4 border-t border-yellow-900/30 space-y-4">
+    <!-- المجموع -->
+    <div class="flex items-center justify-between">
+      <span id="cart-total" class="text-yellow-400 text-xl font-black">0 دج</span>
+      <span class="text-gray-400 text-sm">المجموع</span>
+    </div>
+
+    <!-- زر فتح نموذج الطلب -->
+    <button id="btn-open-form" onclick="openOrderForm()"
+      class="btn-gold w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm">
+      💬 طلب عبر واتساب
+    </button>
+
+    <!-- نموذج الطلب -->
+    <div id="order-form" class="hidden space-y-3">
+      <p class="text-yellow-400 text-sm font-bold text-center pb-1 border-b border-yellow-900/30">معلومات التوصيل</p>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-gray-400 text-xs mb-1 block">الاسم *</label>
+          <input id="f-first" type="text" placeholder="محمد" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+        </div>
+        <div>
+          <label class="text-gray-400 text-xs mb-1 block">اللقب *</label>
+          <input id="f-last" type="text" placeholder="بوعلام" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-gray-400 text-xs mb-1 block">الولاية *</label>
+        <select id="f-wilaya" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm appearance-none">
+          <option value="">-- اختر الولاية --</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-gray-400 text-xs mb-1 block">البلدية *</label>
+        <input id="f-baladiya" type="text" placeholder="رويبة" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+      </div>
+
+      <div>
+        <label class="text-gray-400 text-xs mb-1 block">رقم الهاتف *</label>
+        <input id="f-phone" type="tel" placeholder="0555 123 456" class="gold-input w-full px-3 py-2.5 rounded-lg text-sm"/>
+      </div>
+
+      <p id="form-error" class="hidden text-red-400 text-xs text-center">يرجى ملء جميع الحقول المطلوبة</p>
+
+      <button onclick="submitOrder()" class="btn-wa w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm">
+        📲 إرسال الطلب عبر واتساب
+      </button>
+      <button onclick="closeOrderForm()" class="w-full py-2 text-gray-500 hover:text-gray-300 text-xs transition-colors">إلغاء</button>
+    </div>
+
+    <button onclick="Cart.clear();renderCart()" class="w-full py-2 text-gray-600 hover:text-red-400 text-xs transition-colors">إفراغ السلة</button>
+
+    <!-- أرقام سريعة -->
+    <div class="flex gap-2">
+      <a href="tel:0549195666" class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-yellow-900/20 text-gray-400 hover:text-yellow-400 transition-colors text-xs">
+        0549 195 666 📞
+      </a>
+      <a href="tel:0557113327" class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-yellow-900/20 text-gray-400 hover:text-yellow-400 transition-colors text-xs">
+        0557 113 327 📞
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- زر واتساب ثابت -->
+<a href="https://wa.me/213549195666" target="_blank"
+  id="wa-fab"
+  class="fixed bottom-6 left-6 z-40 w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl shadow-xl">
+  <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+</a>
+
+<!-- ════════════════════════════════════════════
+     السكريبت المشترك
+════════════════════════════════════════════ -->
+<script src="script.js"></script>
+
+<script>
+/* ════════════════════════════════════════════
+   منطق واجهة المتجر
+════════════════════════════════════════════ */
+
+/* ---- الحالة ---- */
+let allProducts = [];
+let activeCategory = "الكل";
+
+/* ---- تهيئة ---- */
+document.addEventListener("DOMContentLoaded", () => {
+  populateWilayaSelect("f-wilaya");
+  initNavbarScroll();
+
+  /* الاستماع للمنتجات */
+  listenProducts((products) => {
+    allProducts = products;
+    document.getElementById("stat-total").textContent = products.length + "+";
+    buildCategoryFilters();
+    renderProducts();
+  });
+
+  /* تحديث السلة عند أي تغيير */
+  Cart.subscribe(renderCart);
+  renderCart();
+});
+
+/* ---- شريط التنقل يتغير عند التمرير ---- */
+function initNavbarScroll() {
+  const nav = document.getElementById("navbar");
+  window.addEventListener("scroll", () => {
+    if (window.scrollY > 40) {
+      nav.classList.add("bg-black/95","backdrop-blur-md","shadow-lg","shadow-black/50","border-b","border-yellow-900/30");
+    } else {
+      nav.classList.remove("bg-black/95","backdrop-blur-md","shadow-lg","shadow-black/50","border-b","border-yellow-900/30");
+    }
+  });
+}
+
+/* ---- فلاتر الفئات ---- */
+function buildCategoryFilters() {
+  const cats = ["الكل", ...new Set(allProducts.map((p) => p.category))];
+  const container = document.getElementById("category-filters");
+  container.innerHTML = cats.map((c) => `
+    <button onclick="setCategory('${c}')"
+      class="cat-filter px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-all duration-200 ${
+        c === activeCategory
+          ? "bg-yellow-500 text-black shadow-md shadow-yellow-900/40"
+          : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200 border border-white/10"
+      }" data-cat="${c}">${c}</button>
+  `).join("");
+}
+
+function setCategory(cat) {
+  activeCategory = cat;
+  buildCategoryFilters();
+  renderProducts();
+}
+
+/* ---- رسم شبكة المنتجات ---- */
+function renderProducts() {
+  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
+  let list = [...allProducts];
+
+  if (activeCategory !== "الكل") list = list.filter((p) => p.category === activeCategory);
+  if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+
+  const grid = document.getElementById("products-grid");
+
+  if (list.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full flex flex-col items-center justify-center py-24 text-center">
+        <div class="text-5xl mb-3">🔍</div>
+        <p class="text-gray-400 font-semibold">لم يتم العثور على منتجات</p>
+        <button onclick="document.getElementById('search-input').value='';setCategory('الكل')"
+          class="mt-4 px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors text-sm">مسح الفلاتر</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = list.map((p, i) => `
+    <div class="product-card rounded-2xl overflow-hidden flex flex-col fade-up" style="animation-delay:${i * 0.06}s">
+      <div class="relative h-52 sm:h-56 overflow-hidden bg-gray-900">
+        <img src="${p.image || 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80'}"
+          alt="${p.name}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+          onerror="this.src='https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=60'"/>
+        <span class="cat-badge absolute top-3 right-3 px-2.5 py-1 rounded-full font-semibold">${p.category}</span>
+        ${!p.inStock ? `<div class="absolute inset-0 bg-black/60 flex items-center justify-center">
+          <span class="text-red-400 font-bold text-sm border border-red-500/50 px-3 py-1 rounded">نفذ المخزون</span>
+        </div>` : ""}
+      </div>
+      <div class="p-4 flex flex-col flex-1">
+        <div class="flex-1">
+          <h3 class="text-white font-bold text-base leading-snug">${p.name}</h3>
+          <p class="text-gray-400 text-xs mt-1.5 leading-relaxed line-clamp-2">${p.description || ""}</p>
+        </div>
+        <div class="mt-4 flex items-center justify-between gap-3">
+          <button onclick='addToCart(${JSON.stringify(p).replace(/'/g, "&#39;")})'
+            ${!p.inStock ? "disabled" : ""}
+            class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+              p.inStock ? "btn-gold" : "bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700"
+            }">
+            ${p.inStock ? "أضف 🛒" : "نفذ"}
+          </button>
+          <span class="text-yellow-400 font-extrabold text-lg">${fmt(p.price)}</span>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* ════════════════════════════════════════════
+   السلة
+════════════════════════════════════════════ */
+function addToCart(product) {
+  Cart.add(product);
+  openCart();
+}
+
+function renderCart() {
+  const items = Cart.getItems();
+  const count = Cart.getCount();
+  const total = Cart.getTotal();
+
+  /* شارة العدد */
+  const badge = document.getElementById("cart-badge");
+  const headerCount = document.getElementById("cart-header-count");
+  if (count > 0) {
+    badge.textContent = count;
+    badge.classList.remove("hidden");
+    badge.classList.add("flex");
+    headerCount.textContent = count;
+    headerCount.classList.remove("hidden");
+    headerCount.classList.add("flex");
+  } else {
+    badge.classList.add("hidden");
+    badge.classList.remove("flex");
+    headerCount.classList.add("hidden");
+    headerCount.classList.remove("flex");
+  }
+
+  /* عناصر السلة */
+  const container = document.getElementById("cart-items");
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-48 text-center">
+        <div class="text-5xl mb-3">🛒</div>
+        <p class="text-gray-500 text-sm">السلة فارغة</p>
+        <p class="text-gray-600 text-xs mt-1">أضف منتجات للبدء</p>
+      </div>`;
+    document.getElementById("cart-footer").classList.add("hidden");
+    return;
+  }
+
+  container.innerHTML = items.map((item) => `
+    <div class="flex gap-3 p-3 rounded-xl bg-white/3 border border-yellow-900/20">
+      <div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-900">
+        <img src="${item.product.image}" alt="${item.product.name}" class="w-full h-full object-cover"
+          onerror="this.src='https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=200&q=60'"/>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-white text-sm font-semibold truncate">${item.product.name}</p>
+        <p class="text-yellow-400 text-sm font-bold mt-0.5">${fmt(item.product.price)}</p>
+        <div class="flex items-center gap-2 mt-2">
+          <button class="qty-btn" onclick="Cart.setQty('${item.product.id}', ${item.qty - 1}); renderCart()">−</button>
+          <span class="text-white text-sm w-5 text-center font-medium">${item.qty}</span>
+          <button class="qty-btn" onclick="Cart.setQty('${item.product.id}', ${item.qty + 1}); renderCart()">+</button>
+          <span class="text-gray-400 text-xs mr-auto">= ${fmt(item.product.price * item.qty)}</span>
+        </div>
+      </div>
+      <button onclick="Cart.remove('${item.product.id}');renderCart()"
+        class="p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 text-gray-600 transition-colors self-start">🗑️</button>
+    </div>
+  `).join("");
+
+  document.getElementById("cart-total").textContent = fmt(total);
+  document.getElementById("cart-footer").classList.remove("hidden");
+}
+
+function openCart() {
+  document.getElementById("cart-sidebar").style.transform = "translateX(0)";
+  document.getElementById("cart-overlay").style.opacity = "1";
+  document.getElementById("cart-overlay").style.pointerEvents = "auto";
+  document.body.style.overflow = "hidden";
+}
+function closeCart() {
+  document.getElementById("cart-sidebar").style.transform = "translateX(100%)";
+  document.getElementById("cart-overlay").style.opacity = "0";
+  document.getElementById("cart-overlay").style.pointerEvents = "none";
+  document.body.style.overflow = "";
+}
+
+function openOrderForm() {
+  document.getElementById("order-form").classList.remove("hidden");
+  document.getElementById("btn-open-form").classList.add("hidden");
+}
+function closeOrderForm() {
+  document.getElementById("order-form").classList.add("hidden");
+  document.getElementById("btn-open-form").classList.remove("hidden");
+}
+
+function submitOrder() {
+  const first   = document.getElementById("f-first").value.trim();
+  const last    = document.getElementById("f-last").value.trim();
+  const wilaya  = document.getElementById("f-wilaya").value;
+  const baladiya= document.getElementById("f-baladiya").value.trim();
+  const phone   = document.getElementById("f-phone").value.trim();
+  const errEl   = document.getElementById("form-error");
+
+  if (!first || !last || !wilaya || !baladiya || !phone) {
+    errEl.classList.remove("hidden");
+    return;
+  }
+  errEl.classList.add("hidden");
+  sendWhatsApp({ firstName: first, lastName: last, wilaya, baladiya, phone });
+  closeCart();
+  closeOrderForm();
+}
+
+/* ---- ملء قائمة الولايات ---- */
+function populateWilayaSelect(id) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  WILAYAS.forEach((w) => {
+    const opt = document.createElement("option");
+    opt.value = opt.textContent = w;
+    sel.appendChild(opt);
+  });
+}
+
+/* ---- القائمة الجوالة ---- */
+function toggleMobileMenu() {
+  document.getElementById("mobile-menu").classList.toggle("hidden");
+}
+function closeMobileMenu() {
+  document.getElementById("mobile-menu").classList.add("hidden");
+}
+</script>
+<script src="https://replit-cdn.com/replit-pill/replit-pill.global.js" data-repl-id="54be373d-f7ee-444a-91c0-206ca5fdd6aa"></script></body>
+</html>
